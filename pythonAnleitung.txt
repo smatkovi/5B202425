@@ -1,0 +1,8 @@
+1) [Win] + R drücken (oder Start -> Ausführen klicken)
+2) "cmd" + [Enter] eingeben
+3) in das Verzeichnis mit der .py-Datei wechseln. Dazu folgendes, ohne Anführungszeichen (") eingeben:
+   "cd <Pfad>" (mit [Enter] bestätigen)
+   der Pfad kann entweder reinkopiert werden mit [Strg] + V, oder es wird vom Wurzelverzeichnis aus Ordnername für Ordnername angegeben, dazu reicht es die ersten Buchstaben anzugeben und durch drücken der Tabulatortaste [Tab] wird das dann vervollständigt.
+3)b) falls es auf einem anderen Laufwerk ist als C: den Laufwerksbuchstaben gefolgt von einem Doppelpunkt (:) eingeben z.B.: "I:" (mit [Enter] bestätigen)
+mit "dir" können die Dateien im Verzeichnis aufgelistet werden
+4) "python <Dateiname>.py" eingeben (mit [Enter] bestätigen)
