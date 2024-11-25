@@ -13,16 +13,14 @@ height = 200
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Pygame Klavier')
 
+
 # Töne und ihre entsprechenden Frequenzen (in Hertz)
+a = 440;
 notes = {
-    pygame.K_a: 261.63,  # C4
-    pygame.K_s: 293.66,  # D4
-    pygame.K_d: 329.63,  # E4
-    pygame.K_f: 349.23,  # F4
-    pygame.K_g: 392.00,  # G4
-    pygame.K_h: 440.00,  # A4
-    pygame.K_j: 493.88,   # B4
-    pygame.K_k: 523.26   # B4
+        
+    pygame.K_g: a*8/9,  # G
+    pygame.K_h: a,  # A
+    pygame.K_j: a*9/8,   # H
 }
 
 # Pygame-Mixer initialisieren
