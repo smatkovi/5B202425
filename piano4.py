@@ -18,9 +18,12 @@ pygame.display.set_caption('Pygame Klavier')
 a = 440;
 notes = {
         
-    pygame.K_g: a*8/9,  # G
+    #pygame.K_g: a*8/9,  # G
+    #pygame.K_h: a,  # A
+    #pygame.K_j: a*9/8,   # H
+    pygame.K_g: a*np.sqrt(4/5),  # G
     pygame.K_h: a,  # A
-    pygame.K_j: a*9/8,   # H
+    pygame.K_j: a*np.sqrt(5/4),   # H
 }
 
 # Pygame-Mixer initialisieren
