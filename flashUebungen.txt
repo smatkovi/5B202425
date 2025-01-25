@@ -1,0 +1,107 @@
+Exercise 1: Create the Table
+
+Write Python code to create a table for storing flashcards.
+
+import sqlite3
+
+conn = sqlite3.connect("flashcards.db")
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS flashcards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        front TEXT,
+        back TEXT,
+        memorized BOOLEAN DEFAULT 0,
+        compartment INTEGER DEFAULT 0
+    )
+''')
+conn.commit()
+conn.close()
+print("Table created successfully.")
+
+Exercise 2: Add a Flashcard
+
+Write a script to add a new flashcard to the database.
+
+import sqlite3
+
+front = input("Enter the front of the flashcard: ")
+back = input("Enter the back of the flashcard: ")
+
+conn = sqlite3.connect("flashcards.db")
+cursor = conn.cursor()
+cursor.execute('INSERT INTO flashcards (front, back) VALUES (?, ?)', (front, back))
+conn.commit()
+conn.close()
+
+print("Flashcard added successfully.")
+
+Exercise 3: Display All Flashcards
+
+Write a script to display all flashcards stored in the database.
+
+import sqlite3
+
+conn = sqlite3.connect("flashcards.db")
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM flashcards')
+flashcards = cursor.fetchall()
+conn.close()
+
+for card in flashcards:
+    print(f"ID: {card[0]}, Front: {card[1]}, Back: {card[2]}, Memorized: {card[3]}, Compartment: {card[4]}")
+
+Exercise 4: Search for a Flashcard
+
+Write a script to search for flashcards based on a keyword.
+
+import sqlite3
+
+keyword = input("Enter a keyword to search for: ")
+
+conn = sqlite3.connect("flashcards.db")
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM flashcards WHERE front LIKE ? OR back LIKE ?', (f'%{keyword}%', f'%{keyword}%'))
+results = cursor.fetchall()
+conn.close()
+
+for card in results:
+    print(f"ID: {card[0]}, Front: {card[1]}, Back: {card[2]}")
+
+Exercise 5: Edit a Flashcard
+
+Write a script to update a flashcard's front and back by its ID.
+
+import sqlite3
+
+card_id = int(input("Enter the ID of the flashcard to edit: "))
+new_front = input("Enter the new front: ")
+new_back = input("Enter the new back: ")
+
+conn = sqlite3.connect("flashcards.db")
+cursor = conn.cursor()
+cursor.execute('UPDATE flashcards SET front = ?, back = ? WHERE id = ?', (new_front, new_back, card_id))
+conn.commit()
+conn.close()
+
+print("Flashcard updated successfully.")
+
+Exercise 6: Study Routine
+
+Write a script to fetch the next flashcard for study.
+
+import sqlite3
+
+conn = sqlite3.connect("flashcards.db")
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM flashcards WHERE memorized = 0 ORDER BY compartment ASC LIMIT 1')
+card = cursor.fetchone()
+conn.close()
+
+if card:
+    print(f"Front: {card[1]}")
+    input("Press Enter to see the back...")
+    print(f"Back: {card[2]}")
+else:
+    print("No cards to study!")
+
