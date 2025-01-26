@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from bottle import Bottle, run, template, request, redirect
 import sqlite3
 
@@ -20,6 +23,16 @@ def init_db():
             memorized BOOLEAN DEFAULT 0,
             compartment INTEGER DEFAULT 0
         )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS study_progress (
+            id INTEGER PRIMARY KEY,
+            last_studied_compartment INTEGER DEFAULT 0
+        )
+    ''')
+    # Ensure there's a row to track progress
+    cursor.execute('''
+        INSERT OR IGNORE INTO study_progress (id, last_studied_compartment) VALUES (1, 0)
     ''')
     conn.commit()
     conn.close()
@@ -59,56 +72,60 @@ def add_card():
     ''')
 
 
-@app.route('/search', method=['GET', 'POST'])
-def search_card():
-    if request.method == 'POST':
-        keyword = request.forms.get('keyword')
-        conn = sqlite3.connect("flashcards.db")
-        cursor = conn.cursor()
-        cursor.execute(
-            'SELECT * FROM flashcards WHERE front LIKE ? OR back LIKE ?',
-            (f'%{keyword}%', f'%{keyword}%'))
-        results = cursor.fetchall()
-        conn.close()
-        return template('''
-            <h1>Search Results</h1>
-            % for card in results:
-                <p><b>Front:</b> {{!card[1]}}</p>
-                <p><b>Back:</b> {{!card[2]}}</p>
-                <a href="/edit/{{card[0]}}">Edit</a><br>
-            % end
-            <a href="/">Back to menu</a>
-        ''',
-                        results=results)
-    return template('''
-        <h1>Search Flashcards</h1>
-        <form method="post">
-            <label>Keyword:</label><br>
-            <input type="text" name="keyword"><br>
-            <button type="submit">Search</button>
-        </form>
-    ''')
-
-
 @app.route('/study', method=['GET', 'POST'])
 def study():
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
+
+    # Get the current studying compartment
     cursor.execute(
-        'SELECT * FROM flashcards WHERE memorized = 0 ORDER BY compartment ASC LIMIT 1'
-    )
+        'SELECT last_studied_compartment FROM study_progress WHERE id = 1')
+    current_compartment = cursor.fetchone()[0]
+
+    # Check if there are any cards left in the current compartment
+    cursor.execute('SELECT COUNT(*) FROM flashcards WHERE compartment = ?',
+                   (current_compartment, ))
+    cards_in_compartment = cursor.fetchone()[0]
+
+    if cards_in_compartment == 0:
+        # If no cards left in current compartment, find the next non-empty compartment
+        cursor.execute('''
+            SELECT MIN(compartment) FROM flashcards WHERE compartment >= 0
+        ''')
+        next_compartment = cursor.fetchone()[0]
+
+        if next_compartment is not None:
+            current_compartment = next_compartment
+            # Update the current studying compartment
+            cursor.execute(
+                'UPDATE study_progress SET last_studied_compartment = ? WHERE id = 1',
+                (current_compartment, ))
+            conn.commit()
+        else:
+            conn.close()
+            return '<h1>No cards to study!</h1><a href="/">Back to menu</a>'
+
+    # Fetch the next card from the current compartment
+    cursor.execute(
+        '''
+        SELECT * FROM flashcards WHERE compartment = ? ORDER BY id ASC LIMIT 1
+    ''', (current_compartment, ))
     card = cursor.fetchone()
-    conn.close()
+
     if card:
         return template('''
             <h1>Study Flashcard</h1>
+            <p><b>Current Compartment:</b> {{current_compartment}}</p>
             <p><b>Front:</b> {{!card[1]}}</p>
             <form method="post" action="/flip/{{card[0]}}">
                 <button type="submit">Flip</button>
             </form>
             <a href="/">Back to menu</a>
         ''',
-                        card=card)
+                        card=card,
+                        current_compartment=current_compartment)
+
+    conn.close()
     return '<h1>No cards to study!</h1><a href="/">Back to menu</a>'
 
 
@@ -136,24 +153,41 @@ def flip(card_id):
     return redirect('/study')
 
 
-@app.route('/memorize/<card_id>', method='POST')
+@app.route('/memorize/<card_id>', method=['POST'])
 def memorize(card_id):
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
+    cursor.execute('UPDATE flashcards SET memorized = 1 WHERE id = ?',
+                   (card_id, ))
+
+    # Move memorized card to the next compartment (increasing interval)
     cursor.execute(
-        'UPDATE flashcards SET memorized = 1, compartment = compartment + 1 WHERE id = ?',
-        (card_id, ))
+        '''
+        UPDATE flashcards SET compartment = compartment + 1 WHERE id = ?
+    ''', (card_id, ))
     conn.commit()
     conn.close()
     return redirect('/study')
 
 
-@app.route('/not_memorized/<card_id>', method='POST')
+@app.route('/not_memorized/<card_id>', method=['POST'])
 def not_memorized(card_id):
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
     cursor.execute('UPDATE flashcards SET memorized = 0 WHERE id = ?',
                    (card_id, ))
+
+    # Move unmemorized card to compartment 0 (reset review frequency)
+    cursor.execute(
+        '''
+        UPDATE flashcards SET compartment = 0 WHERE id = ?
+    ''', (card_id, ))
+
+    # Get the current studying compartment
+    cursor.execute(
+        'SELECT last_studied_compartment FROM study_progress WHERE id = 1')
+    current_compartment = cursor.fetchone()[0]
+
     conn.commit()
     conn.close()
     return redirect('/study')
@@ -184,8 +218,21 @@ def edit_card(card_id):
             <textarea name="back">{{!card[2]}}</textarea><br>
             <button type="submit">Save</button>
         </form>
+        <form method="post" action="/delete/{{card[0]}}">
+            <button type="submit">Delete</button>
+        </form>
     ''',
                     card=card)
+
+
+@app.route('/delete/<card_id>', method=['POST'])
+def delete_card(card_id):
+    conn = sqlite3.connect("flashcards.db")
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM flashcards WHERE id = ?', (card_id, ))
+    conn.commit()
+    conn.close()
+    return redirect('/')
 
 
 if __name__ == "__main__":
