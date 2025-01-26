@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 from bottle import Bottle, run, template, request, redirect
 import sqlite3
 
 # Initialize Bottle app
 app = Bottle()
-
 
 def init_db():
     """Initialize the SQLite database."""
@@ -37,7 +33,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 @app.route('/')
 def index():
     return template('''
@@ -46,7 +41,6 @@ def index():
         <button onclick="window.location='/add'">Add Card</button>
         <button onclick="window.location='/search'">Search Card</button>
     ''')
-
 
 @app.route('/add', method=['GET', 'POST'])
 def add_card():
@@ -71,20 +65,17 @@ def add_card():
         </form>
     ''')
 
-
 @app.route('/study', method=['GET', 'POST'])
 def study():
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
 
     # Get the current studying compartment
-    cursor.execute(
-        'SELECT last_studied_compartment FROM study_progress WHERE id = 1')
+    cursor.execute('SELECT last_studied_compartment FROM study_progress WHERE id = 1')
     current_compartment = cursor.fetchone()[0]
 
     # Check if there are any cards left in the current compartment
-    cursor.execute('SELECT COUNT(*) FROM flashcards WHERE compartment = ?',
-                   (current_compartment, ))
+    cursor.execute('SELECT COUNT(*) FROM flashcards WHERE compartment = ?', (current_compartment,))
     cards_in_compartment = cursor.fetchone()[0]
 
     if cards_in_compartment == 0:
@@ -93,52 +84,47 @@ def study():
             SELECT MIN(compartment) FROM flashcards WHERE compartment >= 0
         ''')
         next_compartment = cursor.fetchone()[0]
-
+        
         if next_compartment is not None:
             current_compartment = next_compartment
             # Update the current studying compartment
-            cursor.execute(
-                'UPDATE study_progress SET last_studied_compartment = ? WHERE id = 1',
-                (current_compartment, ))
+            cursor.execute('UPDATE study_progress SET last_studied_compartment = ? WHERE id = 1', (current_compartment,))
             conn.commit()
         else:
             conn.close()
             return '<h1>No cards to study!</h1><a href="/">Back to menu</a>'
 
     # Fetch the next card from the current compartment
-    cursor.execute(
-        '''
+    cursor.execute('''
         SELECT * FROM flashcards WHERE compartment = ? ORDER BY id ASC LIMIT 1
-    ''', (current_compartment, ))
+    ''', (current_compartment,))
     card = cursor.fetchone()
 
     if card:
         return template('''
             <h1>Study Flashcard</h1>
-            <p><b>Current Compartment:</b> {{current_compartment}}</p>
+            <p><b>Compartment:</b> {{card[4]}}</p>
             <p><b>Front:</b> {{!card[1]}}</p>
             <form method="post" action="/flip/{{card[0]}}">
                 <button type="submit">Flip</button>
             </form>
             <a href="/">Back to menu</a>
-        ''',
-                        card=card,
-                        current_compartment=current_compartment)
+        ''', card=card)
 
     conn.close()
     return '<h1>No cards to study!</h1><a href="/">Back to menu</a>'
-
 
 @app.route('/flip/<card_id>', method=['POST'])
 def flip(card_id):
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM flashcards WHERE id = ?', (card_id, ))
+    cursor.execute('SELECT * FROM flashcards WHERE id = ?', (card_id,))
     card = cursor.fetchone()
     conn.close()
     if card:
         return template('''
             <h1>Study Flashcard</h1>
+            <p><b>Compartment:</b> {{card[4]}}</p>
             <p><b>Back:</b> {{!card[2]}}</p>
             <form method="post" action="/memorize/{{card[0]}}">
                 <button type="submit">Mark as Memorized</button>
@@ -148,50 +134,45 @@ def flip(card_id):
             </form>
             <a href="/edit/{{card[0]}}">Edit</a><br>
             <a href="/">Back to menu</a>
-        ''',
-                        card=card)
+        ''', card=card)
     return redirect('/study')
-
 
 @app.route('/memorize/<card_id>', method=['POST'])
 def memorize(card_id):
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
-    cursor.execute('UPDATE flashcards SET memorized = 1 WHERE id = ?',
-                   (card_id, ))
-
-    # Move memorized card to the next compartment (increasing interval)
-    cursor.execute(
-        '''
-        UPDATE flashcards SET compartment = compartment + 1 WHERE id = ?
-    ''', (card_id, ))
+    
+    # Get the current compartment of the card
+    cursor.execute('SELECT compartment FROM flashcards WHERE id = ?', (card_id,))
+    current_compartment = cursor.fetchone()[0]
+    
+    if current_compartment == 4:
+        # If the card is in compartment 4, delete it
+        cursor.execute('DELETE FROM flashcards WHERE id = ?', (card_id,))
+    else:
+        # Otherwise, move it to the next compartment
+        cursor.execute('''
+            UPDATE flashcards SET memorized = 1, compartment = compartment + 1 WHERE id = ?
+        ''', (card_id,))
+    
     conn.commit()
     conn.close()
     return redirect('/study')
-
 
 @app.route('/not_memorized/<card_id>', method=['POST'])
 def not_memorized(card_id):
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
-    cursor.execute('UPDATE flashcards SET memorized = 0 WHERE id = ?',
-                   (card_id, ))
-
+    cursor.execute('UPDATE flashcards SET memorized = 0 WHERE id = ?', (card_id,))
+    
     # Move unmemorized card to compartment 0 (reset review frequency)
-    cursor.execute(
-        '''
+    cursor.execute('''
         UPDATE flashcards SET compartment = 0 WHERE id = ?
-    ''', (card_id, ))
-
-    # Get the current studying compartment
-    cursor.execute(
-        'SELECT last_studied_compartment FROM study_progress WHERE id = 1')
-    current_compartment = cursor.fetchone()[0]
-
+    ''', (card_id,))
+    
     conn.commit()
     conn.close()
     return redirect('/study')
-
 
 @app.route('/edit/<card_id>', method=['GET', 'POST'])
 def edit_card(card_id):
@@ -206,7 +187,7 @@ def edit_card(card_id):
         conn.commit()
         conn.close()
         return redirect('/')
-    cursor.execute('SELECT * FROM flashcards WHERE id = ?', (card_id, ))
+    cursor.execute('SELECT * FROM flashcards WHERE id = ?', (card_id,))
     card = cursor.fetchone()
     conn.close()
     return template('''
@@ -221,20 +202,18 @@ def edit_card(card_id):
         <form method="post" action="/delete/{{card[0]}}">
             <button type="submit">Delete</button>
         </form>
-    ''',
-                    card=card)
-
+    ''', card=card)
 
 @app.route('/delete/<card_id>', method=['POST'])
 def delete_card(card_id):
     conn = sqlite3.connect("flashcards.db")
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM flashcards WHERE id = ?', (card_id, ))
+    cursor.execute('DELETE FROM flashcards WHERE id = ?', (card_id,))
     conn.commit()
     conn.close()
     return redirect('/')
 
-
 if __name__ == "__main__":
     init_db()
     run(app, host='localhost', port=8080)
+
