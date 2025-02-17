@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from bottle import Bottle, run, template, request, redirect
+from bottle import Bottle, run, template, request, redirect, static_file
 import sqlite3
 
 # Initialize Bottle app
@@ -213,6 +213,35 @@ def delete_card(card_id):
     conn.close()
     return redirect('/')
 
+@app.route('/search', method=['GET', 'POST'])
+def search_card():
+    if request.method == 'POST':
+        keyword = request.forms.get('keyword')
+        conn = sqlite3.connect("flashcards.db")
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM flashcards WHERE front LIKE ? OR back LIKE ?', (f'%{keyword}%', f'%{keyword}%'))
+        results = cursor.fetchall()
+        conn.close()
+        return template('''
+            <h1>Search Results</h1>
+            % for card in results:
+                <p><b>Front:</b> {{!card[1]}}</p>
+                <p><b>Back:</b> {{!card[2]}}</p>
+                <a href="/edit/{{card[0]}}">Edit</a><br>
+            % end
+            <a href="/">Back to menu</a>
+        ''', results=results)
+    return template('''
+        <h1>Search Flashcards</h1>
+        <form method="post">
+            <label>Keyword:</label><br>
+            <input type="text" name="keyword"><br>
+            <button type="submit">Search</button>
+        </form>
+    ''')
+@app.route('/static/<filename>')
+def serve_static(filename):
+    return static_file(filename, root='static')
 if __name__ == "__main__":
     init_db()
     run(app, host='localhost', port=8080)
